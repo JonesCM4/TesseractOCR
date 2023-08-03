@@ -1,0 +1,96 @@
+#libraries
+library(tesseract)
+library(tidyverse)
+library(DBI)
+library(RMySQL)
+
+#connect to database
+'con <- dbConnect(RMySQL::MySQL(), 
+                 dbname = "", 
+                 host = "", 
+                 port = ,
+                 user = "", 
+                 password = "")'
+
+#tesseract extraction to data frame
+data <- tesseract::ocr_data("/Users/colejones/Documents/code/Transaction Report OCR Example.pdf")
+data
+
+#duplicate data
+data_2 <- data
+data <- data_2
+
+#delete columns
+data <- data[, !(names(data) %in% c("confidence", "bbox"))]
+
+#delete report titles
+data <- data[-c(1:8),]
+
+#delete page headers 
+page_headers <- which(data$word == "Month")
+headers_row_count <- c(sapply(page_headers, function(x) seq(x, x + 13)))
+headers_row_count <- unique(headers_row_count)
+data <- data[-headers_row_count, ]
+
+#create matrix
+data$month <- NA
+data$day <- NA
+data$transaction_id <- NA
+data$number_of_items_sold <- NA
+data$credit_card_amount <- NA
+data$cash_amount <- NA
+data$transaction_amount <- NA
+
+#months variable
+months <- c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+
+#find matching month elements and output into month column
+matching_month <- which(data$word %in% months)
+data$month[matching_month] <- data$word[matching_month]
+
+#find matching day elements and output into day column
+matching_day <- matching_month + 1
+data$day[matching_month] <- data$word[matching_day]
+
+#find matching transaction id and output into transaction id column
+matching_transaction_id <- grepl("\\b\\d{8}\\b", data$word)
+data$transaction_id[matching_transaction_id] <- data$word[matching_transaction_id]
+
+#find matching number of items sold elements and output into number of items sold column
+matching_number_of_items_sold <- lag(matching_transaction_id, default = FALSE)
+data$number_of_items_sold[matching_transaction_id] <- data$word[matching_number_of_items_sold]
+
+#find matching credit card amount and output into credit card amount column
+matching_credit_card <- lag(matching_number_of_items_sold, default = FALSE)
+data$credit_card_amount[matching_transaction_id] <- data$word[matching_credit_card]
+
+#find matching cash amount and output into cash amount column
+matching_cash <- lag(matching_credit_card, default = FALSE)
+data$cash_amount[matching_transaction_id] <- data$word[matching_cash]
+
+#find matching amount and output into amount column
+matching_amount <- lag(matching_cash, default = FALSE)
+data$transaction_amount[matching_transaction_id] <- data$word[matching_amount]
+
+#fill month and day columns
+data <- data %>%
+  fill(month, .direction = "down") %>%
+  fill(day, .direction = "down")
+
+#delete extra rows
+data <- data[!is.na(data$transaction_id), ]
+
+#delete word column
+data <- data[, !(names(data) %in% "word")]
+
+#push data to database
+#dbWriteTable(conn = con, name = "", value = data, overwrite = FALSE)
+
+#close database connection
+#dbDisconnect(con)
+
+#set working directory
+setwd("/Users/colejones/Documents/code")
+
+#push to csv
+write.csv(data, file = "OCRExample.csv", row.names = FALSE)
