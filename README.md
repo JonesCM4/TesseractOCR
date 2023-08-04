@@ -1,4 +1,4 @@
-<h1>Optical Character Recognition Data Extraction Using the Tesseract Package in RMachine Learning Diabetes Diagnosis</h1>
+<h1>Optical Character Recognition Data Extraction Using the Tesseract Package in R</h1>
 This code uses the Tesseract package in R to perform OCR on mock financial data extracted from a PDF.
 <br>
 <h2>Features</h2>
